@@ -1,6 +1,7 @@
 const { Op, fn, col, literal } = require('sequelize');
 const Expense = require('../models/expense.model');
 const Category = require('../models/category.model');
+const User = require('../models/user.model');
 
 // @desc    Get monthly expense summary
 // @route   GET /api/reports/monthly/:year/:month
@@ -104,7 +105,13 @@ const getMonthlyExpenseList = async (req, res) => {
 		// Get expenses for the month
 		const expenses = await Expense.findAll({
 			where: whereClause,
-			include: [Category],
+			include: [
+				Category,
+				{
+					model: User,
+					attributes: ['id', 'username'],
+				},
+			],
 			order: [['date', 'DESC']],
 		});
 
@@ -242,7 +249,13 @@ const getDateRangeExpense = async (req, res) => {
 		// Get expenses list for the date range
 		const expenses = await Expense.findAll({
 			where: whereClause,
-			include: [Category],
+			include: [
+				Category,
+				{
+					model: User,
+					attributes: ['id', 'username'],
+				},
+			],
 			order: [['date', 'DESC']],
 		});
 
@@ -269,8 +282,7 @@ const getDateRangeExpense = async (req, res) => {
 // @route   GET /api/reports/range
 // @access  Private
 const getMyDateRangeExpense = async (req, res) => {
-
-  try {
+	try {
 		const { fromDate, toDate } = req.query;
 
 		// Validate dates
@@ -327,7 +339,13 @@ const getMyDateRangeExpense = async (req, res) => {
 		// Get expenses list for the date range
 		const expenses = await Expense.findAll({
 			where: whereClause,
-			include: [Category],
+			include: [
+				Category,
+				{
+					model: User,
+					attributes: ['id', 'username'],
+				},
+			],
 			order: [['date', 'DESC']],
 		});
 
