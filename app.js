@@ -14,6 +14,7 @@ const { sequelize, testDbConnection } = require('./config/db');
 
 // Initialize app
 const app = express();
+app.use(express.static('public'));
 
 // Middleware
 // Define allowed origins
