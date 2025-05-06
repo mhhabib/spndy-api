@@ -97,7 +97,7 @@ const updateExpense = async (req, res) => {
 
 		if (expense) {
 			expense.description = description || expense.description;
-			expense.categoryId = categoryId || expense.categoryId;
+			expense.CategoryId = categoryId || expense.CategoryId;
 			expense.amount = amount || expense.amount;
 			expense.date = date || expense.date;
 
