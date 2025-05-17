@@ -1,5 +1,6 @@
-const { Op, fn, col, literal } = require('sequelize');
+const { Op, fn, col, literal, UUID } = require('sequelize');
 const Expense = require('../models/expense.model');
+const { Entry } = require('../models');
 const Category = require('../models/category.model');
 const User = require('../models/user.model');
 
@@ -34,10 +35,16 @@ const getMonthlyExpense = async (req, res) => {
 			whereClause.userId = req.user.id;
 		}
 
-		// Get total expense for the month
-		const totalExpense = await Expense.sum('amount', {
+		// Get total expense for this date range
+		const totalGeneralExpense = await Expense.sum('amount', {
 			where: whereClause,
 		});
+
+		const totalTourExpense = await Entry.sum('amount', {
+			where: whereClause,
+		});
+
+		const totalExpense = (totalGeneralExpense || 0) + (totalTourExpense || 0);
 
 		// Get categorical breakdown
 		const categoricalExpenses = await Expense.findAll({
@@ -55,15 +62,24 @@ const getMonthlyExpense = async (req, res) => {
 			nest: true,
 		});
 
+		let categoryBreakdown = categoricalExpenses.map((item) => ({
+			categoryId: item.Category.id,
+			categoryName: item.Category.name,
+			total: parseFloat(item.total),
+		}));
+
+		if (totalTourExpense > 0) {
+			categoryBreakdown.push({
+				categoryId: 79, // a random id given so that it doesn't match with existing category in the db
+				categoryName: 'Tour',
+				total: parseFloat(totalTourExpense),
+			});
+		}
 		res.json({
 			month: monthNum,
 			year: yearNum,
-			totalExpense: totalExpense || 0,
-			categoricalExpenses: categoricalExpenses.map((item) => ({
-				categoryId: item.Category.id,
-				categoryName: item.Category.name,
-				total: parseFloat(item.total),
-			})),
+			totalExpense: totalExpense,
+			categoricalExpenses: categoryBreakdown,
 		});
 	} catch (error) {
 		console.error(error);
@@ -156,10 +172,15 @@ const getYearlyExpense = async (req, res) => {
 		}
 
 		// Get total expense for the year
-		const totalExpense = await Expense.sum('amount', {
+		const totalGenealExpense = await Expense.sum('amount', {
 			where: whereClause,
 		});
 
+		const totalTourExpense = await Entry.sum('amount', {
+			whereClause: whereClause,
+		});
+
+		const totalExpense = (totalGenealExpense || 0) + (totalTourExpense || 0);
 		// Get categorical breakdown
 		const categoricalExpenses = await Expense.findAll({
 			attributes: [[fn('SUM', col('amount')), 'total']],
@@ -176,14 +197,24 @@ const getYearlyExpense = async (req, res) => {
 			nest: true,
 		});
 
+		let categoryBreakdown = categoricalExpenses.map((item) => ({
+			categoryId: item.Category.id,
+			categoryName: item.Category.name,
+			total: parseFloat(item.total),
+		}));
+
+		if (totalTourExpense > 0) {
+			categoryBreakdown.push({
+				categoryId: 79, // a random id given so that it doesn't match with existing category in the db
+				categoryName: 'Tour',
+				total: parseFloat(totalTourExpense),
+			});
+		}
+
 		res.json({
 			year: yearNum,
-			totalExpense: totalExpense || 0,
-			categoricalExpenses: categoricalExpenses.map((item) => ({
-				categoryId: item.Category.id,
-				categoryName: item.Category.name,
-				total: parseFloat(item.total),
-			})),
+			totalExpense: totalExpense,
+			categoricalExpenses: categoryBreakdown,
 		});
 	} catch (error) {
 		console.error(error);
@@ -226,9 +257,15 @@ const getDateRangeExpense = async (req, res) => {
 			whereClause.userId = req.user.id;
 		}
 		// Get total expense for the date range
-		const totalExpense = await Expense.sum('amount', {
+		const totalGenealExpense = await Expense.sum('amount', {
 			where: whereClause,
 		});
+
+		const totalTourExpense = await Entry.sum('amount', {
+			whereClause: whereClause,
+		});
+
+		const totalExpense = (totalGenealExpense || 0) + (totalTourExpense || 0);
 
 		// Get categorical breakdown
 		const categoricalExpenses = await Expense.findAll({
@@ -245,6 +282,20 @@ const getDateRangeExpense = async (req, res) => {
 			raw: true,
 			nest: true,
 		});
+
+		let categoryBreakdown = categoricalExpenses.map((item) => ({
+			categoryId: item.Category.id,
+			categoryName: item.Category.name,
+			total: parseFloat(item.total),
+		}));
+
+		if (totalTourExpense > 0) {
+			categoryBreakdown.push({
+				categoryId: 79, // a random id given so that it doesn't match with existing category in the db
+				categoryName: 'Tour',
+				total: parseFloat(totalTourExpense),
+			});
+		}
 
 		// Get expenses list for the date range
 		const expenses = await Expense.findAll({
@@ -264,12 +315,8 @@ const getDateRangeExpense = async (req, res) => {
 				startDate: start.toISOString().split('T')[0],
 				endDate: end.toISOString().split('T')[0],
 			},
-			totalExpense: totalExpense || 0,
-			categoricalExpenses: categoricalExpenses.map((item) => ({
-				categoryId: item.Category.id,
-				categoryName: item.Category.name,
-				total: parseFloat(item.total),
-			})),
+			totalExpense: totalExpense,
+			categoricalExpenses: categoryBreakdown,
 			expenses: expenses,
 		});
 	} catch (error) {
@@ -302,23 +349,35 @@ const getMyDateRangeExpense = async (req, res) => {
 		}
 
 		// Define the where clause
-		const whereClause = {
+		const expenseWhereClause = {
 			date: {
 				[Op.between]: [start, end],
 			},
 		};
 
+		tourWhereClause = {
+			date: {
+				[Op.between]: [start, end],
+			},
+		};
 		// Add userId filter if it exists in the request
 		if (req.user && req.user.id) {
-			whereClause.UserId = req.user.id;
+			expenseWhereClause.UserId = req.user.id;
+			tourWhereClause.userId = req.user.id;
 		} else {
 			return res.status(401).json({ message: 'Not authorized' });
 		}
 
 		// Get total expense for the date range
-		const totalExpense = await Expense.sum('amount', {
-			where: whereClause,
+		const totalGenealExpense = await Expense.sum('amount', {
+			where: expenseWhereClause,
 		});
+
+		const totalTourExpense = await Entry.sum('amount', {
+			where: tourWhereClause,
+		});
+
+		const totalExpense = (totalGenealExpense || 0) + (totalTourExpense || 0);
 
 		// Get categorical breakdown
 		const categoricalExpenses = await Expense.findAll({
@@ -330,15 +389,28 @@ const getMyDateRangeExpense = async (req, res) => {
 					required: true,
 				},
 			],
-			where: whereClause,
+			where: expenseWhereClause,
 			group: ['Category.id', 'Category.name'],
 			raw: true,
 			nest: true,
 		});
 
+		let categoryBreakdown = categoricalExpenses.map((item) => ({
+			categoryId: item.Category.id,
+			categoryName: item.Category.name,
+			total: parseFloat(item.total),
+		}));
+
+		if (totalTourExpense > 0) {
+			categoryBreakdown.push({
+				categoryId: 79, // a random id given so that it doesn't match with existing category in the db
+				categoryName: 'Tour',
+				total: parseFloat(totalTourExpense),
+			});
+		}
 		// Get expenses list for the date range
 		const expenses = await Expense.findAll({
-			where: whereClause,
+			where: expenseWhereClause,
 			include: [
 				Category,
 				{
@@ -355,11 +427,7 @@ const getMyDateRangeExpense = async (req, res) => {
 				endDate: end.toISOString().split('T')[0],
 			},
 			totalExpense: totalExpense || 0,
-			categoricalExpenses: categoricalExpenses.map((item) => ({
-				categoryId: item.Category.id,
-				categoryName: item.Category.name,
-				total: parseFloat(item.total),
-			})),
+			categoricalExpenses: categoryBreakdown,
 			expenses: expenses,
 		});
 	} catch (error) {

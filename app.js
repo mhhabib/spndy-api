@@ -8,6 +8,8 @@ const authRoutes = require('./routes/auth.routes');
 const categoryRoutes = require('./routes/category.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const reportRoutes = require('./routes/report.routes');
+const tourRoutes = require('./routes/tour.routes');
+const tourEntryRoutes = require('./routes/tourEntry.routes');
 
 // Import database connection
 const { sequelize, testDbConnection } = require('./config/db');
@@ -81,6 +83,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/tours', tourRoutes);
+app.use('/api/entries', tourEntryRoutes);
 
 // Test database connection
 testDbConnection();
