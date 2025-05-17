@@ -252,17 +252,13 @@ const getDateRangeExpense = async (req, res) => {
 			},
 		};
 
-		// Add userId filter if it exists in the request
-		if (req.user && req.user.id) {
-			whereClause.userId = req.user.id;
-		}
 		// Get total expense for the date range
 		const totalGenealExpense = await Expense.sum('amount', {
 			where: whereClause,
 		});
 
 		const totalTourExpense = await Entry.sum('amount', {
-			whereClause: whereClause,
+			where: whereClause,
 		});
 
 		const totalExpense = (totalGenealExpense || 0) + (totalTourExpense || 0);
