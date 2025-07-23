@@ -32,11 +32,7 @@ const Tour = sequelize.define(
 		isPublic: {
 			type: DataTypes.BOOLEAN,
 			defaultValue: false,
-		},
-		sharedLink: {
-			type: DataTypes.STRING,
-			defaultValue: null,
-		},
+		}
 	},
 	{
 		tableName: 'tours',

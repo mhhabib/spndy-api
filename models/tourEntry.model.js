@@ -26,7 +26,14 @@ const Entry = sequelize.define(
 			allowNull: true,
 		},
 		type: {
-			type: DataTypes.ENUM('expense', 'experience', 'shopping'),
+			type: DataTypes.ENUM(
+				'food',
+				'expense',
+				'experience',
+				'hotel',
+				'shopping',
+				'transport'
+			),
 			allowNull: false,
 		},
 	},

@@ -1,8 +1,6 @@
 const { Op } = require('sequelize');
 const Tour = require('../models/tour.model');
-const { Entry } = require('../models');
-const runMigration = require('../utils/addSharedLinkColumn');
-const crypto = require('crypto');
+const { Entry, ShareLink } = require('../models');
 
 // @desc    Create a new tour
 // @route   POST /api/tours
@@ -43,6 +41,10 @@ const getTours = async (req, res) => {
 				{
 					model: Entry,
 					as: 'entries',
+				},
+				{
+					model: ShareLink,
+					as: 'shareLink',
 				},
 			],
 			order: [['endDate', 'DESC']],
@@ -134,65 +136,10 @@ const deleteTour = async (req, res) => {
 	}
 };
 
-// DB migrations for shareLink
-
-const addSharedLink = async (req, res) => {
-	try {
-		await runMigration();
-		res.send('Migration complete!');
-	} catch (error) {
-		console.error(error);
-		res.status(500).send('Migration failed!');
-	}
-};
-
-// @desc    Update tour sharing status and link
-// @route   POST /api/tours/:id/share
-// @access  Public (secure if needed)
-const shareTour = async (req, res) => {
-	try {
-		const { id } = req.params;
-		const { isPublic } = req.body;
-
-		if (typeof isPublic !== 'boolean') {
-			return res
-				.status(400)
-				.json({ message: '`isPublic` must be true or false.' });
-		}
-
-		const tour = await Tour.findByPk(id);
-
-		if (!tour) {
-			return res.status(404).json({ message: 'Tour not found.' });
-		}
-
-		tour.isPublic = isPublic;
-
-		if (isPublic) {
-			// Generate a unique 6-digit hex string
-			tour.sharedLink = crypto.randomBytes(3).toString('hex');
-		} else {
-			tour.sharedLink = null;
-		}
-
-		await tour.save();
-
-		res.status(200).json({
-			message: `Tour ${isPublic ? 'shared' : 'unshared'} successfully.`,
-			tour,
-		});
-	} catch (error) {
-		console.error('Error sharing tour:', error);
-		res.status(500).json({ message: 'Server error' });
-	}
-};
-
 module.exports = {
 	createTour,
 	getTours,
 	getTourById,
 	updateTour,
 	deleteTour,
-	addSharedLink,
-	shareTour,
 };
