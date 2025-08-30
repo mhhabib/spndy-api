@@ -1,7 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
+const helmet = require('helmet');
+const morgan = require('morgan');
 const { Op } = require('sequelize');
-require('dotenv').config();
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -11,34 +14,58 @@ const reportRoutes = require('./routes/report.routes');
 const tourRoutes = require('./routes/tour.routes');
 const tourEntryRoutes = require('./routes/tourEntry.routes');
 
-// Import database connection
+// DB
 const { sequelize, testDbConnection } = require('./config/db');
 
-// Initialize app
 const app = express();
-app.use(express.static('public'));
 
-// Middleware
-// Define allowed origins
-const allowedOrigins = [
-	'http://localhost:8080',
-	'http://localhost:3000',
-	'https://spndy.xyz',
-];
+// ------------------------------
+// Trust proxy if behind CDN/ELB
+// ------------------------------
+if (process.env.TRUST_PROXY === '1') {
+	app.set('trust proxy', true);
+}
 
-// Apply CORS middleware first
+// ------------------------------
+// Security + Compression + Logs
+// ------------------------------
+app.use(
+	helmet({
+		crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images/fonts across origins
+	})
+);
+app.use(compression()); // gzip/deflate; a reverse proxy may add brotli
+
+if (process.env.NODE_ENV !== 'test') {
+	app.use(morgan('combined'));
+}
+
+// ------------------------------q
+// ------------------------------
+// ------------------------------
+// CORS config (dev vs prod)
+// ------------------------------
+const devOrigins = ['http://localhost:3000', 'http://localhost:8080'];
+
+const prodOrigins = ['https://spndy.xyz'];
+
+// If you want to allow multiple production domains, extend this array or use env
+const allowedOrigins =
+	process.env.NODE_ENV === 'production'
+		? prodOrigins
+		: [...devOrigins, ...prodOrigins];
+
 app.use(
 	cors({
-		origin: function (origin, callback) {
-			// Allow requests with no origin (like mobile apps or curl requests)
+		origin(origin, callback) {
+			// Allow non-browser tools (curl, Postman, etc.)
 			if (!origin) return callback(null, true);
 
-			if (allowedOrigins.indexOf(origin) !== -1) {
-				callback(null, true);
-			} else {
-				console.log('Blocked by CORS: ', origin);
-				callback(new Error('Not allowed by CORS'));
+			if (allowedOrigins.includes(origin)) {
+				return callback(null, true);
 			}
+
+			return callback(new Error(`CORS blocked for origin: ${origin}`));
 		},
 		credentials: true,
 		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -52,33 +79,50 @@ app.use(
 	})
 );
 
-// Handle OPTIONS preflight requests
+// Explicit preflight (optional)
 app.options('*', cors());
 
-// Explicit CORS header setting for all responses
-app.use((req, res, next) => {
-	const origin = req.headers.origin;
-	if (allowedOrigins.includes(origin)) {
-		res.header('Access-Control-Allow-Origin', origin);
-	}
-	res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-	res.header(
-		'Access-Control-Allow-Headers',
-		'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-	);
-	res.header('Access-Control-Allow-Credentials', 'true');
+// ------------------------------
+// Parsers
+// ------------------------------
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-	// Handle preflight
-	if (req.method === 'OPTIONS') {
-		return res.status(204).end();
+// ------------------------------
+// Static assets with long-lived cache
+// ------------------------------
+// For fingerprinted (hashed) files like app.abc123.js, we can mark as immutable
+app.use(
+	express.static('public', {
+		etag: true,
+		lastModified: true,
+		maxAge: '30d',
+		setHeaders: (res, path) => {
+			// If the filename looks hashed, make it immutable
+			if (/\.[0-9a-f]{8,}\./i.test(path)) {
+				res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+			}
+		},
+	})
+);
+
+// ------------------------------
+// API-level HTTP caching
+// ------------------------------
+// Keep API fresh but allow short-lived caching + validator-based revalidation.
+// Note: Express sends ETag by default for JSON. You can also add Last-Modified if you track it.
+app.use((req, res, next) => {
+	if (req.method === 'GET' && req.path.startsWith('/api/')) {
+		// Short TTL + allow shared caches (CDN) to respect it as well
+		// Adjust TTLs per route as needed
+		res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=30');
 	}
-	next();
+	return next();
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // For form-data
-
+// ------------------------------
 // Routes
+// ------------------------------
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/expenses', expenseRoutes);
@@ -86,26 +130,31 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/entries', tourEntryRoutes);
 
-// Test database connection
-testDbConnection();
-
-// Sync sequelize models with database
-const syncDb = async () => {
+// ------------------------------
+// DB init
+// ------------------------------
+(async () => {
 	try {
+		await testDbConnection();
 		await sequelize.sync();
-		console.log('Database synced successfully');
-	} catch (error) {
-		console.error('Error syncing database:', error);
+		console.log('Database connected & synced');
+	} catch (err) {
+		console.error('Database init error:', err);
 	}
-};
+})();
 
-syncDb();
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-	console.error(err.stack);
-	res.status(500).json({ message: 'Server error' });
+app.use((req, res) => {
+	res.status(404).json({ message: 'Not found' });
 });
 
-// Export app for server to use
+// ------------------------------
+// Error handler (final)
+// ------------------------------
+app.use((err, req, res, next) => {
+	console.error(err.stack || err.message || err);
+	const status =
+		err.message && err.message.startsWith('CORS blocked') ? 403 : 500;
+	res.status(status).json({ message: err.message || 'Server error' });
+});
+
 module.exports = app;

@@ -1,4 +1,4 @@
-const { verifyToken } = require('../utils/jwt.utils');
+const { verifyAccessToken } = require('../utils/jwt.utils');
 const User = require('../models/user.model');
 
 const protect = async (req, res, next) => {
@@ -10,7 +10,7 @@ const protect = async (req, res, next) => {
 	) {
 		try {
 			token = req.headers.authorization.split(' ')[1];
-			const decoded = verifyToken(token);
+			const decoded = verifyAccessToken(token);
 
 			if (!decoded) {
 				return res
