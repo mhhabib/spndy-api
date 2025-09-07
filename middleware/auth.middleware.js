@@ -11,7 +11,6 @@ const protect = async (req, res, next) => {
 		try {
 			token = req.headers.authorization.split(' ')[1];
 			const decoded = verifyAccessToken(token);
-
 			if (!decoded) {
 				return res
 					.status(401)
@@ -21,7 +20,7 @@ const protect = async (req, res, next) => {
 			req.user = await User.findByPk(decoded.id, {
 				attributes: { exclude: ['password'] },
 			});
-			next();
+			return next();
 		} catch (error) {
 			console.error(error);
 			res.status(401).json({ message: 'Not authorized, token failed' });

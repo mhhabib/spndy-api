@@ -5,6 +5,7 @@ const compression = require('compression');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { Op } = require('sequelize');
+const cookieParser = require('cookie-parser');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -31,25 +32,45 @@ if (process.env.TRUST_PROXY === '1') {
 // ------------------------------
 app.use(
 	helmet({
-		crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images/fonts across origins
+		crossOriginResourcePolicy: { policy: 'cross-origin' },
+		contentSecurityPolicy:
+			process.env.NODE_ENV === 'production'
+				? {
+						directives: {
+							defaultSrc: ["'self'"],
+							scriptSrc: ["'self'"],
+							styleSrc: ["'self'", "'unsafe-inline'"],
+							imgSrc: ["'self'", 'data:', 'https:'],
+							connectSrc: ["'self'"],
+							fontSrc: ["'self'"],
+							objectSrc: ["'none'"],
+							mediaSrc: ["'self'"],
+							frameSrc: ["'none'"],
+						},
+				  }
+				: false,
 	})
 );
-app.use(compression()); // gzip/deflate; a reverse proxy may add brotli
 
-if (process.env.NODE_ENV !== 'test') {
+app.use(compression());
+
+if (process.env.NODE_ENV !== 'development') {
 	app.use(morgan('combined'));
+} else {
+	app.use(morgan('dev')); // More readable in development
 }
 
-// ------------------------------q
-// ------------------------------
 // ------------------------------
 // CORS config (dev vs prod)
 // ------------------------------
-const devOrigins = ['http://localhost:3000', 'http://localhost:8080'];
+const devOrigins = [
+	'http://localhost:3000',
+	'http://localhost:8080',
+	'http://localhost:5173',
+];
 
 const prodOrigins = ['https://spndy.xyz'];
 
-// If you want to allow multiple production domains, extend this array or use env
 const allowedOrigins =
 	process.env.NODE_ENV === 'production'
 		? prodOrigins
@@ -65,10 +86,11 @@ app.use(
 				return callback(null, true);
 			}
 
+			console.warn(`CORS blocked for origin: ${origin}`);
 			return callback(new Error(`CORS blocked for origin: ${origin}`));
 		},
-		credentials: true,
-		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+		credentials: true, // This is crucial for cookies
+		methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 		allowedHeaders: [
 			'Origin',
 			'X-Requested-With',
@@ -76,12 +98,13 @@ app.use(
 			'Accept',
 			'Authorization',
 		],
+		exposedHeaders: ['X-Total-Count'],
 	})
 );
 
-// Explicit preflight (optional)
+// Explicit preflight handling
 app.options('*', cors());
-
+app.use(cookieParser());
 // ------------------------------
 // Parsers
 // ------------------------------
@@ -112,9 +135,12 @@ app.use(
 // Keep API fresh but allow short-lived caching + validator-based revalidation.
 // Note: Express sends ETag by default for JSON. You can also add Last-Modified if you track it.
 app.use((req, res, next) => {
-	if (req.method === 'GET' && req.path.startsWith('/api/')) {
-		// Short TTL + allow shared caches (CDN) to respect it as well
-		// Adjust TTLs per route as needed
+	if (
+		req.method === 'GET' &&
+		(req.path.startsWith('/api/reports/range') ||
+			req.path.startsWith('/api/reports/myexpense/range') ||
+			req.path.startsWith('/api/categories'))
+	) {
 		res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=30');
 	}
 	return next();
