@@ -8,6 +8,8 @@ const {
 	verifyAccessToken,
 } = require('../utils/jwt.utils');
 
+const { logger } = require('../logger/LoggerConfig');
+
 // Helper: validate signup inputs
 const validateSignup = (username, email, password) => {
 	if (!username || !email || !password) return 'All fields are required';
@@ -57,6 +59,13 @@ const signup = async (req, res) => {
 
 		res.cookie('refreshToken', refreshToken, getCookieOptions());
 
+		logger.info('New user sign up ', {
+			id: user.id,
+			username: user.username,
+			email: user.email,
+			token: accessToken,
+		});
+
 		res.status(201).json({
 			id: user.id,
 			username: user.username,
@@ -64,7 +73,7 @@ const signup = async (req, res) => {
 			token: accessToken,
 		});
 	} catch (error) {
-		console.error('Signup error:', error);
+		logger.error('Signup error:', error);
 		res.status(500).json({ message: 'Server error during signup' });
 	}
 };
@@ -105,6 +114,13 @@ const login = async (req, res) => {
 
 		res.cookie('refreshToken', refreshToken, getCookieOptions());
 
+		logger.info('Login user ', {
+			id: user.id,
+			username: user.username,
+			email: user.email,
+			token: accessToken,
+		});
+
 		res.json({
 			id: user.id,
 			username: user.username,
@@ -112,7 +128,7 @@ const login = async (req, res) => {
 			token: accessToken,
 		});
 	} catch (error) {
-		console.error('Login error:', error);
+		logger.error('Login error:', error);
 		res.status(500).json({ message: 'Server error during login' });
 	}
 };
@@ -216,8 +232,9 @@ const logout = (req, res) => {
 			sameSite: 'Strict',
 		});
 		res.json({ message: 'Logged out successfully' });
+		LOG.info('Logged out successfully');
 	} catch (error) {
-		console.error('Logout error:', error);
+		LOG.error('Logout error:', error);
 		res.status(500).json({ message: 'Server error during logout' });
 	}
 };

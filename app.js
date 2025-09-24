@@ -14,6 +14,8 @@ const expenseRoutes = require('./routes/expense.routes');
 const reportRoutes = require('./routes/report.routes');
 const tourRoutes = require('./routes/tour.routes');
 const tourEntryRoutes = require('./routes/tourEntry.routes');
+const hisabRoutes = require('./routes/hisab.routes');
+const { logger } = require('./logger/LoggerConfig');
 
 // DB
 const { sequelize, testDbConnection } = require('./config/db');
@@ -55,7 +57,11 @@ app.use(
 app.use(compression());
 
 if (process.env.NODE_ENV !== 'development') {
-	app.use(morgan('combined'));
+	app.use(
+		morgan('combined', {
+			stream: { write: (message) => logger.info(message.trim()) },
+		})
+	);
 } else {
 	app.use(morgan('dev')); // More readable in development
 }
@@ -75,6 +81,11 @@ const allowedOrigins =
 	process.env.NODE_ENV === 'production'
 		? prodOrigins
 		: [...devOrigins, ...prodOrigins];
+
+logger.info('The app is running', {
+	env: process.env.NODE_ENV,
+	origin: allowedOrigins,
+});
 
 app.use(
 	cors({
@@ -155,6 +166,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/entries', tourEntryRoutes);
+app.use('/api/hisabs', hisabRoutes);
 
 // ------------------------------
 // DB init
@@ -163,9 +175,9 @@ app.use('/api/entries', tourEntryRoutes);
 	try {
 		await testDbConnection();
 		await sequelize.sync();
-		console.log('Database connected & synced');
+		logger.info('Database connected & synced');
 	} catch (err) {
-		console.error('Database init error:', err);
+		logger.error('Database init error:', err);
 	}
 })();
 

@@ -1,0 +1,46 @@
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
+const User = require('./user.model')
+
+const Hisab = sequelize.define('Hisab', {
+	id: {
+		type: DataTypes.STRING, 
+		primaryKey: true,
+	},
+	from: {
+		type: DataTypes.STRING,
+		allowNull: false,
+		unique: true,
+	},
+	to: {
+		type: DataTypes.STRING,
+		allowNull: false,
+		unique: true,
+	},
+    type: {
+		type: DataTypes.ENUM('BORROW', 'LEND'),
+		allowNull: false,
+	},
+	description: {
+		type: DataTypes.STRING,
+		allowNull: false,
+	},
+	amount: {
+		type: DataTypes.DECIMAL(10, 2),
+		allowNull: false,
+	},
+	date: {
+		type: DataTypes.DATEONLY,
+		allowNull: false,
+		defaultValue: DataTypes.NOW,
+	},
+});
+
+Hisab.beforeCreate((record, options) => {
+  record.id = `hisab_${Date.now()}`;
+});
+
+User.hasMany(Hisab);
+Hisab.belongsTo(User);
+
+module.exports = Hisab;
