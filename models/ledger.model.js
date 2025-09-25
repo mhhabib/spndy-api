@@ -2,7 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 const User = require('./user.model')
 
-const Hisab = sequelize.define('Hisab', {
+const Ledger = sequelize.define('Ledger', {
 	id: {
 		type: DataTypes.STRING, 
 		primaryKey: true,
@@ -36,11 +36,11 @@ const Hisab = sequelize.define('Hisab', {
 	},
 });
 
-Hisab.beforeCreate((record, options) => {
+Ledger.beforeCreate((record, options) => {
   record.id = `hisab_${Date.now()}`;
 });
 
-User.hasMany(Hisab);
-Hisab.belongsTo(User);
+User.hasMany(Ledger);
+Ledger.belongsTo(User);
 
-module.exports = Hisab;
+module.exports = Ledger;

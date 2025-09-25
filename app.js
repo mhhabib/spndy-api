@@ -14,7 +14,7 @@ const expenseRoutes = require('./routes/expense.routes');
 const reportRoutes = require('./routes/report.routes');
 const tourRoutes = require('./routes/tour.routes');
 const tourEntryRoutes = require('./routes/tourEntry.routes');
-const hisabRoutes = require('./routes/hisab.routes');
+const ledgerRoutes = require('./routes/ledger.routes');
 const { logger } = require('./logger/LoggerConfig');
 
 // DB
@@ -166,7 +166,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/entries', tourEntryRoutes);
-app.use('/api/hisabs', hisabRoutes);
+app.use('/api/ledgers', ledgerRoutes);
 
 // ------------------------------
 // DB init
