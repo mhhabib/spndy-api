@@ -1,23 +1,21 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-const User = require('./user.model')
+const User = require('./user.model');
 
 const Ledger = sequelize.define('Ledger', {
 	id: {
-		type: DataTypes.STRING, 
+		type: DataTypes.STRING,
 		primaryKey: true,
 	},
 	from: {
 		type: DataTypes.STRING,
 		allowNull: false,
-		unique: true,
 	},
 	to: {
 		type: DataTypes.STRING,
 		allowNull: false,
-		unique: true,
 	},
-    type: {
+	type: {
 		type: DataTypes.ENUM('BORROW', 'LEND'),
 		allowNull: false,
 	},
@@ -37,7 +35,7 @@ const Ledger = sequelize.define('Ledger', {
 });
 
 Ledger.beforeCreate((record, options) => {
-  record.id = `hisab_${Date.now()}`;
+	record.id = `hisab_${Date.now()}`;
 });
 
 User.hasMany(Ledger);
